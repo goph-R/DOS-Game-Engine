@@ -103,7 +103,7 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Types: TFrameBuffer, PFrameBuffer, TImage, PImage, TRectangle, TPalette, TRGBColor
 - Init: InitVGA, DoneVGA, WaitForVSync
 - Buffers: CreateFrameBuffer, GetScreenBuffer, ClearFrameBuffer, CopyFrameBuffer, CopyFrameBufferRect (REP MOVSW for 286 speed), RenderFrameBuffer, FreeFrameBuffer
-- Palette: SetPalette, SetRGB, GetRGB, RotatePalette, LoadPalette
+- Palette: SetPalette, SetPartialPalette(pal,from,to), SetRGB, GetRGB, RotatePalette, LoadPalette
 - Clipping: SetClipRectangle (set rendering bounds)
 - Draw: DrawLine, DrawHLine, DrawVLine, DrawFillRect, DrawRect, GetImage, PutImage, PutImageRect, PutFlippedImage, PutFlippedImageRect, ClearImage, FreeImage
 - Color 0 = transparent, auto-clip (0-319, 0-199)
@@ -191,7 +191,7 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - No initialization required, always available
 
 **KEYBOARD.PAS** - INT 9h keyboard handler
-- InitKeyboard, DoneKeyboard, IsKeyDown(scancode), IsKeyPressed(scancode), ClearKeyPressed
+- InitKeyboard, DoneKeyboard, IsKeyDown(scancode), IsKeyPressed(scancode), ClearKeyPressed, ClearAllKeyStates, WaitForAnyKeyPress
 - Constants: Key_A..Key_Z, Key_0..Key_9, Key_F1..Key_F12
 - Arrow keys: Key_Up/Down/Left/Right
 - Special: Key_Escape, Key_Enter, Key_Space, Key_Backspace, Key_Tab
@@ -207,28 +207,40 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Visibility: ShowMouse, HideMouse
 - Input: UpdateMouse, GetMouseX, GetMouseY, GetMouseButtons, IsMouseButtonDown(btn)
 - Range: SetMouseRangeX(minx,maxx), SetMouseRangeY(miny,maxy)
+- Cursor: UseDefaultMouseCursor(use) - enable/disable default cursor (False for custom cursors)
 - **CRITICAL**: Call UpdateMouse once per frame
 
 **SPRITE.PAS** - Delta-time sprite animation
 - Constants: SpritePlayType_Forward/PingPong/Once (0/1/2), MaxSpriteFrames = 64
 - Types: TSprite (PImage, Frames, FrameCount, Width, Height, Duration (seconds), PlayType), PSprite
 - TSpriteInstance (Sprite, X, Y, FlipX, FlipY, CurrentTime, Hidden, PlayBackward), PSpriteInstance
-- UpdateSprite(instance,deltatime), DrawSprite(instance,fb)
+- UpdateSprite(instance,deltatime), DrawSprite(instance,fb), SpriteGetCurrentFrame(instance): Byte, CheckSpriteCollision(a,b): Boolean (pixel-perfect)
 
 **RESMAN.PAS** - Resource manager (2025)
 - TResourceManager: Centralized asset loading from XML manifest
 - Types: ResType_Music/Sound/Image/Font/Sprite/Palette
 - Methods: Init(lazy), LoadFromXML(file), GetImage/Font/Sprite/Sound/Music/Palette, Done
+- Manual: LoadResource(name), UnloadResource(name) - load/free individual resources
+- LastError: String property for error messages when GetXXX returns nil
 - Features: Lazy/eager loading, XML-relative paths, dependency resolution, name-based lookup
+- Music singleton: Only one music track loaded at a time (previous auto-unloaded)
+- Palette extraction: `<image name="x" path="X.PCX" palette="x" />` extracts palette from image
 - See DOCS\RESMAN.md for XML format
 
 **DGECORE.PAS** - DOS Game Engine Core (2025)
-- TGame: Main game object (Init, Start, Run, Done, PlayMusic, SetNextScreen, GetScreen, AddScreen)
-- Auto-initializes: VGA, Config, ResMan, RTC, Keyboard, Mouse, SBDSP, framebuffers
+- TGame: Main game object, Init(AConfig: PConfig; ResXmlPath: String)
+- Methods: Start, Run, Done (virtual), Stop, Update(DeltaTime) (virtual), ResetTiming
+- Music: PlayMusic(name), PauseMusic, StopMusic (all exit early if SoundCard=None)
+- Screens: AddScreen(name,screen), SetNextScreen(name), GetScreen(name), SetScreen (internal)
+- Framebuffers: BackgroundBuffer (static), BackBuffer (working), ScreenBuffer (VGA display)
+- Properties: Config (PConfig), ResMan, Running, VGAInitialized, MouseInitialized, SoundInitialized
+- Auto-initializes: Config, ResMan, RTC, Keyboard, Mouse, SBDSP in Start; VGA deferred to Run
+- CleanupOnExit: ExitProc handler for safe shutdown on Ctrl+C/Runtime Error
 - Screen management via ScreenMap, deferred screen switching, delta-time game loop
 - **No global Game variable** - games extend TGame and provide their own global instance
 - **Resource loading**: Load game-specific resources in TGame.Start override
-- Exit handler: Uses module-level CurrentGame pointer (set in Init, cleared in Done)
+- **VGA timing**: InitVGA called in Run (not Start), then PostInit called on all screens before loop
+- **Exit shortcut**: Alt+Q stops the game
 - Dependencies: VGA, Config, StrMap, RTCTimer, Keyboard, Mouse, SBDSP, ResMan, PlayHSC (9 units)
 
 **DGESCR.PAS** - DOS Game Engine Screen Management (2025)
@@ -242,6 +254,7 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 **DRECT.PAS** - Dirty rectangle system (2025)
 - Optimized rendering for partial screen updates
 - AddDirtyRect(rect), FlushDirtyRects(backbuffer), ClearDirtyRects, GetDirtyCount
+- MergeRectangles(r1,r2,var result) - merge two rects into one encompassing both (for sprite movement trails)
 - Max 256 rectangles, copies only changed regions to screen
 
 **MINIXML.PAS** - Lightweight XML parser
@@ -267,12 +280,16 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Types: TLinkedList (First, Last, Count), TListEntry (Next, Prev, Value), PListEntry, PListValue
 - ListInit(list), ListAdd(list,value), ListRemove(list,entry), ListRemoveByValue(list,value), ListContains(list,value), ListFree(list)
 
-**CONFIG.PAS** - CONFIG.INI management
-- Types: TConfig (SoundCard, SBPort, SBIRQ, SBDMA, UseMouse)
+**CONFIG.PAS** - CONFIG.INI management (extensible object)
+- TConfig object (PConfig = ^TConfig): Path, SoundCard, SBPort, SBIRQ, SBDMA, UseMouse
+- Constructor: Init(ConfigIniPath), Destructor: Done (virtual)
+- Virtual methods: Load, Save, SetDefaults, ParseKeyValue(key,value), WriteSettings(var F: Text)
 - Constants: GameTitle, GameVersion, TileSize
 - Sound card types: SoundCard_None/Adlib/SoundBlaster (0/1/2), SoundCardNames array
 - SBPort values: 2=$220, 4=$240, 6=$260, 8=$280
-- LoadConfig(config,file), SaveConfig(config,file)
+- Backward-compatible: LoadConfig(config,file), SaveConfig(config,file) (call Init+Load/Save internally)
+- **Extensible**: Games extend TConfig to add custom fields, override ParseKeyValue/WriteSettings/SetDefaults
+- **Virtual methods require `{$F+}`**
 
 **TEXTUI.PAS** - Text mode UI ($B800:0000)
 - Constants: ScreenCols = 80, ScreenRows = 25
@@ -301,20 +318,23 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Viewport rendering, auto-clip, skips tile ID=0
 
 **VGAUI.PAS** - VGA Mode 13h UI system (2025)
-- Event handlers (Delphi-style): TKeyPressEvent = procedure(Sender: PWidget; KeyCode: Byte); TMouseEvent = procedure(Sender: PWidget; X, Y: Integer; Button: Byte); TFocusEvent = procedure(Sender: PWidget)
+- Event types (Delphi-style, need `{$F+}`): TKeyPressEvent(Sender,KeyCode), TMouseEvent(Sender,X,Y,Button), TFocusEvent(Sender), TClickEvent(Sender)
 - TUIStyle object: HighColor, NormalColor, LowColor, FocusColor; Init(high,normal,low,focus), RenderPanel(rect,pressed,fb) virtual
-- TWidget object (base): Rectangle, Visible, Enabled, Focused, NeedsRedraw, Tag
-  - Event callbacks: OnKeyPress, OnMouseDown, OnMouseUp, OnMouseMove, OnFocus, OnBlur (procedure pointers)
+- TWidget object (base): Rectangle, Visible, Enabled, Focused, NeedsRedraw, Tag, WidgetType
+  - Event callbacks: OnClick, OnKeyPress, OnMouseDown, OnMouseUp, OnMouseMove, OnFocus, OnBlur
   - Init(x,y,w,h), MarkDirty, SetVisible(value), SetEnabled(value)
-  - Do* virtual methods: DoKeyPress(keycode), DoMouseDown/Up/Move(x,y,button), DoFocus, DoBlur (override to intercept events)
+  - Do* virtual methods: DoKeyPress(keycode), DoMouseDown/Up/Move(x,y,button), DoFocus, DoBlur
   - Update(dt) virtual, Render(fb,style) virtual, RenderFocusRectangle(fb,style), Done virtual
-- TLabel(TWidget): Text, Font; Init(x,y,w,h,text,font), SetText(text), Render virtual, Done virtual
-- TButton(TWidget): Text, Font, Pressed; Init(x,y,w,h,text,font), SetText(text), DoKeyPress/DoMouseDown/DoBlur virtual, Render virtual, Done virtual
-- TCheckbox(TWidget): Text, Font, Image, Checked; Init(x,y,w,h,text,font,image), SetText(text), SetChecked(value), IsChecked, DoKeyPress/DoMouseDown virtual, Render virtual, Done virtual
-- TLineEdit(TWidget): Text, Font, MaxLength, CursorVisible, CursorTimer; Init(x,y,w,h,maxlen,font), SetText(text), GetText, DoKeyPress/DoMouseDown virtual, Update virtual, Render virtual, Done virtual
-- TUIManager: Init(fb,bg), AddWidget, RemoveWidget, SetFocus, Update(dt), RenderDirty, Run(updateproc,vsync), Stop, Done
+- TLabel(TWidget): Text, Font, Lines, LineCount, TextAlign; Init(x,y,w,h,text,font), SetText(text)
+- TButton(TWidget): Text, Font, Lines, LineCount, TextAlign, Pressed; Init(x,y,w,h,text,font), SetText(text)
+- TCheckbox(TWidget): Text, Font, Lines, LineCount, Image, ImageAlign, Checked; Init(x,y,w,h,text,font,image), SetChecked(value), IsChecked
+- TLineEdit(TWidget): Text, Font, MaxLength, CursorVisible, CursorTimer; Init(x,y,w,h,font,maxlen), SetText(text), GetText, Clear
+- TUIManager: Init(fb,bg), AddWidget, RemoveWidget, SetFocus, SetStyle(style), FocusInDirection(dx,dy), Update(dt), RenderAll, RenderDirty, DispatchKeyboardEvents, DispatchMouseEvents, Run(updateproc,vsync), Stop, Done
+- WidgetType constants: WidgetType_Base/Label/Button/Checkbox/LineEdit (0-4)
+- **OnClick**: Use for buttons/checkboxes (fires on Enter/Space/mouse click). Use OnKeyPress for text input/custom keys
 - **CRITICAL**: Use constructor/destructor syntax `New(Button, Init(...))` and `Dispose(Button, Done)` for VMT initialization
-- **CRITICAL**: Event handlers need `{$F+}` (far calls). Assign to OnKeyPress/OnMouseDown/etc fields
+- **CRITICAL**: Event handlers need `{$F+}` (far calls). Assign with `@` operator
+- Multi-line text support with automatic wrapping (Lines: TMultiLineText)
 - Keyboard + mouse navigation (Tab, arrows, Enter, Space, click), Delphi-style event architecture
 - Integrates with LINKLIST, VGAFONT, KEYBOARD, MOUSE, VGA, DRECT, RTCTIMER
 
@@ -333,6 +353,18 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Use cases: Save game checksums, highscore tamper protection, file integrity
 - Table computed at unit init (1KB lookup table, polynomial $EDB88320)
 - Compatible with PHP 8 crc32(), ZIP, PNG, gzip
+
+**HISCORE.PAS** - CRC32-protected high score table (2025)
+- Types: THighScore (Names, Scores, Count, Salt)
+- Constants: MaxHighScores = 10
+- InitHighScore(var HS, salt) - initialize empty table with game-specific salt
+- LoadHighScore(file,var HS): Boolean - load from XML with hash verification (False if tampered/missing)
+- SaveHighScore(file,name,score,var HS): Boolean - add score and save (auto-sorts, limits to top 10)
+- IsHighScore(HS,score): Boolean - check if score qualifies for top 10
+- ComputeHighScoreHash(HS): String - CRC32 hash of all scores (internal)
+- XML format: `<highscores hash="..."><highscore name="..." score="..."/></highscores>`
+- Salted CRC32 prevents casual tampering and cross-game score copying
+- Dependencies: CRC32, MINIXML, STRUTIL
 
 ## File Formats
 
@@ -405,17 +437,16 @@ DoneRTC;
 **UI (VGAUI)**:
 ```pascal
 {$F+}
-procedure OnButtonClick(Sender: PWidget; KeyCode: Byte);
+procedure OnButtonClick(Sender: PWidget);
 begin
-  if (KeyCode = Key_Enter) or (KeyCode = Key_Space) then
-    { Handle click }
+  { Handle click - fires on Enter/Space/mouse click }
 end;
 {$F-}
 
 var Last, Cur, Delta: Real;
 UI.Init(BackBuffer, Background); Style.Init(15,7,8,14); UI.SetStyle(@Style);
 New(Button, Init(x,y,w,h,'Click',@Font)); { MUST use constructor syntax! }
-Button^.OnKeyPress := @OnButtonClick; UI.AddWidget(Button);
+Button^.OnClick := @OnButtonClick; UI.AddWidget(Button);
 InitRTC(1024); Last := GetTimeSeconds;
 while run do
   Cur := GetTimeSeconds; Delta := Cur - Last; Last := Cur;
@@ -438,7 +469,7 @@ ResMan.Done; { Cleanup all resources }
 { GLOBALS.PAS - Extend TGame with game-specific resources }
 unit Globals;
 interface
-uses DGECore, DGEScr, VGA, VGAFont;
+uses DGECore, DGEScr, Config, VGA, VGAFont;
 
 type
   TMyGame = object(TGame)
@@ -446,7 +477,7 @@ type
     PlayerSprite: PImage;
     TitleFont: PFont;
 
-    constructor Init(const ConfigIniPath: String; const ResXmlPath: String);
+    constructor Init(AConfig: PConfig; const ResXmlPath: String);
     destructor Done; virtual;
     procedure Start; virtual;
   end;
@@ -456,9 +487,9 @@ var
 
 implementation
 
-constructor TMyGame.Init(const ConfigIniPath: String; const ResXmlPath: String);
+constructor TMyGame.Init(AConfig: PConfig; const ResXmlPath: String);
 begin
-  inherited Init(ConfigIniPath, ResXmlPath);
+  inherited Init(AConfig, ResXmlPath);
 end;
 
 destructor TMyGame.Done;
@@ -478,7 +509,7 @@ end.
 
 { MAIN.PAS - Define screens and run game }
 program Main;
-uses Globals;
+uses Globals, Config;
 
 type
   PMenuScreen = ^TMenuScreen;
@@ -486,15 +517,19 @@ type
     procedure Update(DT: Real); virtual;
   end;
 
-var Menu: PMenuScreen;
+var
+  GameConfig: TConfig;
+  Menu: PMenuScreen;
 
 begin
-  Game.Init('CONFIG.INI', 'DATA\RES.XML');
+  GameConfig.Init('CONFIG.INI');
+  Game.Init(@GameConfig, 'DATA\RES.XML');
   New(Menu, Init); Game.AddScreen('menu', Menu);
   Game.Start; { Initialize subsystems + load resources }
   Game.SetNextScreen('menu'); { Queue initial screen }
   Game.Run; { Auto delta-time loop }
   Game.Done;
+  GameConfig.Done;
 end.
 ```
 
