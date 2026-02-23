@@ -370,14 +370,14 @@ end;
 
 procedure TXiCloneGame.PostInitDialog;
 var
-  DialogSourceRect: TRectangle;
+  R: TRectangle;
   DialogX: Integer;
-  DialogTopHeight: Word;
-  DialogBottomHeight: Word;
+  TopH: Word;
+  BottomH: Word;
 begin
   DialogHeight := GetDialogHeight;
-  DialogBottomHeight := 2;
-  DialogTopHeight := DialogHeight - DialogBottomHeight;
+  BottomH := 2;
+  TopH := DialogHeight - BottomH;
 
   if PrevDialog = Dialog_None then
     RenderDialogDitheredBackground(BackBuffer);
@@ -386,27 +386,25 @@ begin
   GetImage(DialogSavedBgImage, GetDialogX, GetDialogY, DialogImage^.Width, DialogHeight, BackBuffer);
 
   { Render the top part of the dialog background }
-  DialogSourceRect.X := 0;
-  DialogSourceRect.Y := 0;
-  DialogSourceRect.Width := DialogImage^.Width;
-  DialogSourceRect.Height := DialogTopHeight;
-  PutImageRect(DialogImage^, DialogSourceRect, GetDialogX, GetDialogY, False, BackBuffer);
+  R.X := 0;
+  R.Y := 0;
+  R.Width := DialogImage^.Width;
+  R.Height := TopH;
+  PutImageRect(DialogImage^, R, GetDialogX, GetDialogY, False, BackBuffer);
 
   { Render the bottom part of the dialog background }
-  DialogSourceRect.X := 0;
-  DialogSourceRect.Y := DialogImage^.Height - DialogBottomHeight;
-  DialogSourceRect.Width := DialogImage^.Width;
-  DialogSourceRect.Height := DialogBottomHeight;
-  PutImageRect(DialogImage^, DialogSourceRect, GetDialogX, GetDialogY + DialogTopHeight, False, BackBuffer);
+  R.X := 0;
+  R.Y := DialogImage^.Height - BottomH;
+  R.Width := DialogImage^.Width;
+  R.Height := BottomH;
+  PutImageRect(DialogImage^, R, GetDialogX, GetDialogY + TopH, False, BackBuffer);
 
   { Save the UI background, we just need the background of the dialog }
-  DialogSourceRect.X := GetDialogX;
-  DialogSourceRect.Y := GetDialogY;
-  DialogSourceRect.Width := DialogImage^.Width;
-  DialogSourceRect.Height := DialogHeight;
-  CopyFrameBufferRect(BackBuffer, DialogSourceRect,
-                      DialogBackgroundBuffer, DialogSourceRect.X, DialogSourceRect.Y);
-
+  R.X := GetDialogX;
+  R.Y := GetDialogY;
+  R.Width := DialogImage^.Width;
+  R.Height := DialogHeight;
+  CopyFrameBufferRect(BackBuffer, R, DialogBackgroundBuffer, R.X, R.Y);
 
   if PrevDialog = Dialog_None then
     { Fullscreen render  }
@@ -414,10 +412,9 @@ begin
   else
   begin
     { Only the dialog column render }
-    DialogSourceRect.Y := 0;
-    DialogSourceRect.Height := 200;
-    CopyFrameBufferRect(BackBuffer, DialogSourceRect,
-                        ScreenBuffer, DialogSourceRect.X, DialogSourceRect.Y);
+    R.Y := 0;
+    R.Height := 200;
+    CopyFrameBufferRect(BackBuffer, R, ScreenBuffer, R.X, R.Y);
   end;
 
   CalculateDialogWidgetPositions;
