@@ -3,7 +3,7 @@ unit XiGame;
 interface
 
 uses
-  VGA, VGAUI, VGAFont, HiScore, DGECore, DGEScr, Config, Keyboard, StrUtil, GenTypes;
+  VGA, VGAUI, VGAFont, HiScore, BaseGame, Screen, Config, Keyboard, StrUtil, GenTypes;
 
 const
   TileSize = 16;
@@ -41,8 +41,8 @@ type
     Dialog_SubmitScore
   );
 
-  { Xi Clone game - extends TGame with game-specific resources }
-  TXiCloneGame = object(TGame)
+  { Xi Clone game - extends TBaseGame with game-specific resources }
+  TXiCloneGame = object(TBaseGame)
     { Game-specific resources }
     GemsImage: PImage;
     FontLarge: PFont;

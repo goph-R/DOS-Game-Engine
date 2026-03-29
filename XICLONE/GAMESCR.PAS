@@ -3,7 +3,7 @@ unit GameScr;
 interface
 
 uses
-  VGA, VGAFont, VGAPrint, VGAUI, DRect, Keyboard, DGECore, DGEScr, PCX, StrUtil,
+  VGA, VGAFont, VGAPrint, VGAUI, DRect, Keyboard, BaseGame, Screen, PCX, StrUtil,
   GenTypes, XiGame, HiScore;
 
 const

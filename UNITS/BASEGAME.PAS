@@ -1,10 +1,10 @@
-{ DGECORE.PAS - DOS Game Engine Core Framework
+{ BASEGAME.PAS - DOS Game Engine Core Framework
 
   Purpose: Main game framework object that integrates all engine subsystems
            (VGA, audio, input, resources) with screen management and a
            delta-time game loop.
 
-  TGame Object:
+  TBaseGame Object:
     Extend this in your game's Globals unit to create your main game instance.
     Handles automatic initialization, resource management, and game loop.
 
@@ -26,14 +26,14 @@
     - PostInit: Called AFTER InitVGA - safe for palette operations
     - Resource loading: Override Start method to load game resources
     - Exit handler: Automatic cleanup on Ctrl+C/Break
-    - No global Game variable - extend TGame in your Globals unit
+    - No global Game variable - extend TBaseGame in your Globals unit
 
   Dependencies: VGA, Config, StrMap, RTCTimer, Keyboard, Mouse, SBDSP,
                 ResMan, PlayHSC (9 units)
 
   Usage Example:
     type
-      TMyGame = object(TGame)
+      TMyGame = object(TBaseGame)
         procedure Start; virtual;
       end;
 
@@ -51,7 +51,7 @@
     GameConfig.Done;
 }
 
-unit DGECore;
+unit BaseGame;
 
 {$G+}  { Enable 286 instructions }
 {$F+}  { Enable far calls for procedural types }
@@ -59,13 +59,13 @@ unit DGECore;
 interface
 
 uses
-  VGA, Config, StrMap, RTCTimer, Keyboard, Mouse, SBDSP, ResMan, PlayHSC, DGEScr;
+  VGA, Config, StrMap, RTCTimer, Keyboard, Mouse, SBDSP, ResMan, PlayHSC, Screen;
 
 type
-  PGame = ^TGame;
+  PBaseGame = ^TBaseGame;
 
   { Main game object }
-  TGame = object
+  TBaseGame = object
     { Configuration & Resources }
     Config: PConfig;
     ResFilePath: String;
@@ -117,9 +117,9 @@ type
 implementation
 
 var
-  CurrentGame: PGame;  { Pointer to current game instance for exit handler }
+  CurrentGame: PBaseGame;  { Pointer to current game instance for exit handler }
 
-{ ========== TGame Implementation ========== }
+{ ========== TBaseGame Implementation ========== }
 
 { Cleanup procedure for abnormal exit }
 {$F+}
@@ -130,7 +130,7 @@ begin
 end;
 {$F-}
 
-constructor TGame.Init(AConfig: PConfig; const ResXmlPath: String);
+constructor TBaseGame.Init(AConfig: PConfig; const ResXmlPath: String);
 begin
   { Set current game instance for exit handler }
   CurrentGame := @Self;
@@ -156,7 +156,7 @@ begin
   MapInit(ScreenMap);
 end;
 
-destructor TGame.Done;
+destructor TBaseGame.Done;
 var
   I: Integer;
   ScreenPtr: PScreen;
@@ -221,7 +221,7 @@ begin
   CurrentGame := nil;
 end;
 
-procedure TGame.Start;
+procedure TBaseGame.Start;
 begin
   { InitVGA needs to be right before PostInit! }
 
@@ -265,7 +265,7 @@ begin
   ScreenBuffer := GetScreenBuffer;
 end;
 
-procedure TGame.Run;
+procedure TBaseGame.Run;
 var
   I: Integer;
   ScreenPtr: PScreen;
@@ -301,7 +301,7 @@ begin
   end;
 end;
 
-procedure TGame.Update(DT: Real);
+procedure TBaseGame.Update(DT: Real);
 begin
   { Set the screen via the NextScreen if needed }
   SetScreen;
@@ -325,7 +325,7 @@ begin
   ClearKeyPressed;
 end;
 
-procedure TGame.PlayMusic(const Name: String);
+procedure TBaseGame.PlayMusic(const Name: String);
 var
   Music: PHSC_Obj;
 begin
@@ -349,7 +349,7 @@ begin
   Music^.Start;
 end;
 
-procedure TGame.PauseMusic;
+procedure TBaseGame.PauseMusic;
 begin
   { Exit if no sound card }
   if Config^.SoundCard = SoundCard_None then
@@ -359,7 +359,7 @@ begin
   { Music.Pause; }
 end;
 
-procedure TGame.StopMusic;
+procedure TBaseGame.StopMusic;
 begin
   { Exit if no sound card }
   if Config^.SoundCard = SoundCard_None then
@@ -369,13 +369,13 @@ begin
   { Music.Stop; }
 end;
 
-procedure TGame.SetNextScreen(const Name: String);
+procedure TBaseGame.SetNextScreen(const Name: String);
 begin
   if MapContains(ScreenMap, Name) then
     NextScreen := PScreen(MapGet(ScreenMap, Name));
 end;
 
-procedure TGame.SetScreen;
+procedure TBaseGame.SetScreen;
 begin
   if NextScreen = nil then
     Exit;
@@ -394,7 +394,7 @@ begin
   NextScreen := nil;
 end;
 
-function TGame.GetScreen(const Name: String): PScreen;
+function TBaseGame.GetScreen(const Name: String): PScreen;
 begin
   if MapContains(ScreenMap, Name) then
     GetScreen := PScreen(MapGet(ScreenMap, Name))
@@ -402,17 +402,17 @@ begin
     GetScreen := nil
 end;
 
-procedure TGame.AddScreen(const Name: String; AScreen: PScreen);
+procedure TBaseGame.AddScreen(const Name: String; AScreen: PScreen);
 begin
   MapPut(ScreenMap, Name, AScreen);
 end;
 
-procedure TGame.Stop;
+procedure TBaseGame.Stop;
 begin
   Running := False;
 end;
 
-procedure TGame.ResetTiming;
+procedure TBaseGame.ResetTiming;
 begin
   LastTime := GetTimeSeconds;
 end;

@@ -161,8 +161,8 @@ XICLONE.EXE
 - **[LOGGER.PAS](https://docs.dynart.net/dos-game-engine/UTILS/LOGGER.html)** - Debug file logger
 
 ### Game Framework (DGE - DOS Game Engine)
-- **[DGECORE.PAS](https://docs.dynart.net/dos-game-engine/ADVANCED/DGECORE.html)** - Game framework core (TGame object, subsystem integration)
-- **[DGESCR.PAS](https://docs.dynart.net/dos-game-engine/ADVANCED/DGECORE.html)** - Screen/state management (TScreen base object)
+- **[BASEGAME.PAS](https://docs.dynart.net/dos-game-engine/ADVANCED/BASEGAME.html)** - Game framework core (TBaseGame object, subsystem integration)
+- **[SCREEN.PAS](https://docs.dynart.net/dos-game-engine/ADVANCED/BASEGAME.html)** - Screen/state management (TScreen base object)
 
 ### Guides
 - **[Build Guide](https://docs.dynart.net/dos-game-engine/STARTING/BUILD.html)** - Compilation instructions

@@ -227,8 +227,8 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Palette extraction: `<image name="x" path="X.PCX" palette="x" />` extracts palette from image
 - See DOCS\RESMAN.md for XML format
 
-**DGECORE.PAS** - DOS Game Engine Core (2025)
-- TGame: Main game object, Init(AConfig: PConfig; ResXmlPath: String)
+**BASEGAME.PAS** - DOS Game Engine Core (2025)
+- TBaseGame: Main game object, Init(AConfig: PConfig; ResXmlPath: String)
 - Methods: Start, Run, Done (virtual), Stop, Update(DeltaTime) (virtual), ResetTiming
 - Music: PlayMusic(name), PauseMusic, StopMusic (all exit early if SoundCard=None)
 - Screens: AddScreen(name,screen), SetNextScreen(name), GetScreen(name), SetScreen (internal)
@@ -237,13 +237,13 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Auto-initializes: Config, ResMan, RTC, Keyboard, Mouse, SBDSP in Start; VGA deferred to Run
 - CleanupOnExit: ExitProc handler for safe shutdown on Ctrl+C/Runtime Error
 - Screen management via ScreenMap, deferred screen switching, delta-time game loop
-- **No global Game variable** - games extend TGame and provide their own global instance
-- **Resource loading**: Load game-specific resources in TGame.Start override
+- **No global Game variable** - games extend TBaseGame and provide their own global instance
+- **Resource loading**: Load game-specific resources in TBaseGame.Start override
 - **VGA timing**: InitVGA called in Run (not Start), then PostInit called on all screens before loop
 - **Exit shortcut**: Alt+Q stops the game
 - Dependencies: VGA, Config, StrMap, RTCTimer, Keyboard, Mouse, SBDSP, ResMan, PlayHSC (9 units)
 
-**DGESCR.PAS** - DOS Game Engine Screen Management (2025)
+**SCREEN.PAS** - DOS Game Engine Screen Management (2025)
 - TScreen: Abstract screen/state base (Init, Done, Update, Show, Hide, PostInit)
 - **PostInit**: Called AFTER VGA initialized - use for SetPalette, RenderFrameBuffer, etc. NOT for loading resources
 - Screen lifecycle: Init → PostInit → Show → Update loop → Hide → Done
@@ -466,13 +466,13 @@ ResMan.Done; { Cleanup all resources }
 
 **Game Framework (DGE - DOS Game Engine)**:
 ```pascal
-{ GLOBALS.PAS - Extend TGame with game-specific resources }
+{ GLOBALS.PAS - Extend TBaseGame with game-specific resources }
 unit Globals;
 interface
-uses DGECore, DGEScr, Config, VGA, VGAFont;
+uses BaseGame, Screen, Config, VGA, VGAFont;
 
 type
-  TMyGame = object(TGame)
+  TMyGame = object(TBaseGame)
     { Game-specific resources }
     PlayerSprite: PImage;
     TitleFont: PFont;

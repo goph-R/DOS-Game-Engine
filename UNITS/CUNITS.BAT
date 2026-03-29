@@ -122,12 +122,12 @@ echo Compiling MATHUTIL.PAS...
 tpc MATHUTIL.PAS
 if errorlevel 1 goto error
 
-echo Compiling DGESCR.PAS...
-tpc DGESCR.PAS
+echo Compiling SCREEN.PAS...
+tpc SCREEN.PAS
 if errorlevel 1 goto error
 
-echo Compiling DGECORE.PAS...
-tpc DGECORE.PAS
+echo Compiling BASEGAME.PAS...
+tpc BASEGAME.PAS
 if errorlevel 1 goto error
 
 echo.

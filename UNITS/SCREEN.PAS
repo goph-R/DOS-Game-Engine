@@ -1,4 +1,4 @@
-{ DGESCR.PAS - DOS Game Engine Screen/State Management
+{ SCREEN.PAS - DOS Game Engine Screen/State Management
 
   Purpose: Base screen/state object for game state machines. Provides
            lifecycle hooks for initialization, rendering, and cleanup.
@@ -32,7 +32,7 @@
     Game.AddScreen('menu', Menu);
 }
 
-unit DGEScr;
+unit Screen;
 
 {$F+}  { Enable far calls for virtual methods }
 
