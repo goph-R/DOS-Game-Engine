@@ -15,13 +15,17 @@ SPX (Sprite XML) external file format for sprite definitions.
 - TSpriteFrame record with per-frame drawing offsets (OffsetX, OffsetY)
 - Per-frame duration support for variable-speed animations
 - Default width/height on `<sprite>` tag inherited by frames
+- LoadSPX/GetSPXSprite/FreeSPX standalone sprite loading API in SPRITE.PAS
+- TSpriteSheet record for self-contained sprite sheet management
 - SPX format documentation (DOCS/ADVANCED/SPX.md)
+- SPXTEST: test program for standalone SPX loading
 
 ### Changed
 - TSprite.Frames now uses TSpriteFrame (with Rect, OffsetX, OffsetY, Duration) instead of TRectangle
 - TSprite gains HasFrameDurations and TotalDuration fields for variable timing
 - SpriteGetCurrentFrame supports cumulative duration lookup
-- DrawSprite and CheckSpriteCollision apply frame offsets (negated when flipped)
+- DrawSprite and CheckSpriteCollision apply frame offsets, mirrored within sprite bounding box when flipped
+- TSprite.Width/Height uses sprite-level defaults from SPX when available (not always first frame)
 
 ---
 

@@ -1,0 +1,23 @@
+@echo off
+echo Compiling SPXTEST and dependencies...
+echo.
+
+cd ..\UNITS
+call CUNITS.BAT
+if errorlevel 1 goto error
+
+echo Compiling SPXTEST.PAS...
+cd ..\TESTS
+tpc -U..\UNITS SPXTEST.PAS
+if errorlevel 1 goto error
+
+echo.
+echo Build successful!
+goto end
+
+:error
+echo.
+echo Build failed!
+cd ..\TESTS
+
+:end

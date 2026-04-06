@@ -216,6 +216,8 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - TSprite (Image, Frames (array of TSpriteFrame), FrameCount, Width, Height, Duration, PlayType, HasFrameDurations, TotalDuration), PSprite
 - TSpriteInstance (Sprite, X, Y, FlipX, FlipY, CurrentTime, Hidden, PlayBackward), PSpriteInstance
 - UpdateSprite(instance,deltatime), DrawSprite(instance,fb), SpriteGetCurrentFrame(instance): Byte, CheckSpriteCollision(a,b): Boolean (pixel-perfect)
+- SPX loading: TSpriteSheet (Image, Palette, Sprites[0..31], Names[0..31], Count), PSpriteSheet
+- LoadSPX(file,sheet): Boolean, GetSPXSprite(sheet,name): PSprite, FreeSPX(sheet), GetLoadSPXError
 - **Per-frame durations**: When HasFrameDurations=True, each frame uses its own Duration; SpriteGetCurrentFrame uses cumulative lookup
 - **Frame offsets**: OffsetX/OffsetY shift drawing position (negated when flipped)
 

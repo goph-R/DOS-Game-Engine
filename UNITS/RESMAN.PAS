@@ -693,8 +693,8 @@ begin
   SprData^.Sprite.Duration := SprData^.Duration;
   SprData^.Sprite.PlayType := SpritePlayType_Forward;
 
-  { Set sprite dimensions from first frame (already parsed) }
-  if SprData^.Sprite.FrameCount > 0 then
+  { Set sprite dimensions from first frame if not already set }
+  if (SprData^.Sprite.Width = 0) and (SprData^.Sprite.FrameCount > 0) then
   begin
     SprData^.Sprite.Width := SprData^.Sprite.Frames[0].Rect.Width;
     SprData^.Sprite.Height := SprData^.Sprite.Frames[0].Rect.Height;
@@ -856,6 +856,18 @@ begin
   end
   else
     SprData^.Sprite.TotalDuration := 0.0;
+
+  { Set sprite dimensions from sprite-level defaults or first frame }
+  if HasDefSize then
+  begin
+    SprData^.Sprite.Width := DefWidth;
+    SprData^.Sprite.Height := DefHeight;
+  end
+  else
+  begin
+    SprData^.Sprite.Width := SprData^.Sprite.Frames[0].Rect.Width;
+    SprData^.Sprite.Height := SprData^.Sprite.Frames[0].Rect.Height;
+  end;
 
   { Store in descriptor }
   Desc^.Data := SprData;
