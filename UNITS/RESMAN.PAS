@@ -126,6 +126,8 @@ type
       function LoadSoundResource(Desc: PResourceDescriptor): Boolean;
       function LoadMusicResource(Desc: PResourceDescriptor): Boolean;
       function LoadPaletteResource(Desc: PResourceDescriptor): Boolean;
+      function ParseSPXFile(const SPXDir, Filename: String): Boolean;
+      function ParseSPXSprite(XMLNode: PXMLNode; Desc: PResourceDescriptor): Boolean;
   end;
 
 implementation
@@ -230,6 +232,10 @@ begin
   { Store duration for later use }
   SprData^.Duration := StrToReal(XMLAttr(XMLNode, 'duration'));
 
+  { Inline sprites use uniform timing }
+  SprData^.Sprite.HasFrameDurations := False;
+  SprData^.Sprite.TotalDuration := 0.0;
+
   { Parse frame rectangles }
   FrameIdx := 0;
   FrameNode := XMLFirstChild(XMLNode, '');
@@ -248,10 +254,13 @@ begin
       end;
 
       { Store frame rectangle }
-      SprData^.Sprite.Frames[FrameIdx].X := StrToInt(XMLAttr(FrameNode, 'x'));
-      SprData^.Sprite.Frames[FrameIdx].Y := StrToInt(XMLAttr(FrameNode, 'y'));
-      SprData^.Sprite.Frames[FrameIdx].Width := StrToInt(XMLAttr(FrameNode, 'width'));
-      SprData^.Sprite.Frames[FrameIdx].Height := StrToInt(XMLAttr(FrameNode, 'height'));
+      SprData^.Sprite.Frames[FrameIdx].Rect.X := StrToInt(XMLAttr(FrameNode, 'x'));
+      SprData^.Sprite.Frames[FrameIdx].Rect.Y := StrToInt(XMLAttr(FrameNode, 'y'));
+      SprData^.Sprite.Frames[FrameIdx].Rect.Width := StrToInt(XMLAttr(FrameNode, 'width'));
+      SprData^.Sprite.Frames[FrameIdx].Rect.Height := StrToInt(XMLAttr(FrameNode, 'height'));
+      SprData^.Sprite.Frames[FrameIdx].OffsetX := 0;
+      SprData^.Sprite.Frames[FrameIdx].OffsetY := 0;
+      SprData^.Sprite.Frames[FrameIdx].Duration := 0.0;
 
       Inc(FrameIdx);
     end;
@@ -276,10 +285,15 @@ end;
 
 { TResourceManager.ParseXML }
 function TResourceManager.ParseXML(RootNode: PXMLNode): Boolean;
+label
+  NextChild;
 var
   Child: PXMLNode;
   Desc: PResourceDescriptor;
   TagName: String;
+  SPXPath: String;
+  SPXDir: String;
+  I: Integer;
 begin
   ParseXML := False;
   Child := XMLFirstChild(RootNode, '');
@@ -287,6 +301,29 @@ begin
   while Child <> nil do
   begin
     TagName := Child^.Name;
+
+    { Handle sprite-xml (external SPX file, no name attribute) }
+    if TagName = 'sprite-xml' then
+    begin
+      if not XMLHasAttr(Child, 'path') then
+      begin
+        LastError := 'sprite-xml missing path attribute';
+        Exit;
+      end;
+      SPXPath := XMLAttr(Child, 'path');
+      SPXDir := '';
+      for I := Length(SPXPath) downto 1 do
+      begin
+        if SPXPath[I] = '\' then
+        begin
+          SPXDir := Copy(SPXPath, 1, I);
+          Break;
+        end;
+      end;
+      if not ParseSPXFile(SPXDir, BasePath + SPXPath) then
+        Exit;
+      goto NextChild;
+    end;
 
     { Create descriptor based on tag type }
     New(Desc);
@@ -402,6 +439,7 @@ begin
       Dispose(Desc);
     end;
 
+  NextChild:
     Child := XMLNextSibling(Child, '');
   end;
 
@@ -658,8 +696,8 @@ begin
   { Set sprite dimensions from first frame (already parsed) }
   if SprData^.Sprite.FrameCount > 0 then
   begin
-    SprData^.Sprite.Width := SprData^.Sprite.Frames[0].Width;
-    SprData^.Sprite.Height := SprData^.Sprite.Frames[0].Height;
+    SprData^.Sprite.Width := SprData^.Sprite.Frames[0].Rect.Width;
+    SprData^.Sprite.Height := SprData^.Sprite.Frames[0].Rect.Height;
   end;
 
   { Store in map }
@@ -667,6 +705,255 @@ begin
   Desc^.Loaded := True;
 
   LoadSpriteResource := True;
+end;
+
+{ TResourceManager.ParseSPXSprite }
+function TResourceManager.ParseSPXSprite(XMLNode: PXMLNode; Desc: PResourceDescriptor): Boolean;
+var
+  SprData: PSpriteData;
+  FrameNode: PXMLNode;
+  FrameIdx: Byte;
+  DefWidth, DefHeight: Word;
+  HasDefSize: Boolean;
+  HasAnyFrameDur: Boolean;
+  DefaultDur: Real;
+  TotalDur: Real;
+  I: Byte;
+begin
+  ParseSPXSprite := False;
+
+  { Validate required attributes }
+  if not XMLHasAttr(XMLNode, 'image') then
+  begin
+    LastError := 'Sprite "' + Desc^.Name^ + '" missing image attribute';
+    Exit;
+  end;
+
+  if not XMLHasAttr(XMLNode, 'duration') then
+  begin
+    LastError := 'Sprite "' + Desc^.Name^ + '" missing duration attribute';
+    Exit;
+  end;
+
+  { Allocate sprite data structure }
+  New(SprData);
+  FillChar(SprData^, SizeOf(TSpriteData), 0);
+
+  { Store image name }
+  New(SprData^.ImageName);
+  SprData^.ImageName^ := XMLAttr(XMLNode, 'image');
+
+  { Store duration }
+  SprData^.Duration := StrToReal(XMLAttr(XMLNode, 'duration'));
+
+  { Get default width/height from sprite tag }
+  HasDefSize := XMLHasAttr(XMLNode, 'width') and XMLHasAttr(XMLNode, 'height');
+  if HasDefSize then
+  begin
+    DefWidth := StrToInt(XMLAttr(XMLNode, 'width'));
+    DefHeight := StrToInt(XMLAttr(XMLNode, 'height'));
+  end
+  else
+  begin
+    DefWidth := 0;
+    DefHeight := 0;
+  end;
+
+  { Parse frame rectangles }
+  FrameIdx := 0;
+  HasAnyFrameDur := False;
+  FrameNode := XMLFirstChild(XMLNode, '');
+  while (FrameNode <> nil) and (FrameIdx < MaxSpriteFrames) do
+  begin
+    if FrameNode^.Name = 'frame' then
+    begin
+      { x and y are always required }
+      if not XMLHasAttr(FrameNode, 'x') or not XMLHasAttr(FrameNode, 'y') then
+      begin
+        LastError := 'Sprite "' + Desc^.Name^ + '" frame missing x/y attributes';
+        Dispose(SprData^.ImageName);
+        Dispose(SprData);
+        Exit;
+      end;
+
+      SprData^.Sprite.Frames[FrameIdx].Rect.X := StrToInt(XMLAttr(FrameNode, 'x'));
+      SprData^.Sprite.Frames[FrameIdx].Rect.Y := StrToInt(XMLAttr(FrameNode, 'y'));
+
+      { Width/height: use frame-level if present, otherwise sprite default }
+      if XMLHasAttr(FrameNode, 'width') then
+        SprData^.Sprite.Frames[FrameIdx].Rect.Width := StrToInt(XMLAttr(FrameNode, 'width'))
+      else if HasDefSize then
+        SprData^.Sprite.Frames[FrameIdx].Rect.Width := DefWidth
+      else
+      begin
+        LastError := 'Sprite "' + Desc^.Name^ + '" frame missing width (no default)';
+        Dispose(SprData^.ImageName);
+        Dispose(SprData);
+        Exit;
+      end;
+
+      if XMLHasAttr(FrameNode, 'height') then
+        SprData^.Sprite.Frames[FrameIdx].Rect.Height := StrToInt(XMLAttr(FrameNode, 'height'))
+      else if HasDefSize then
+        SprData^.Sprite.Frames[FrameIdx].Rect.Height := DefHeight
+      else
+      begin
+        LastError := 'Sprite "' + Desc^.Name^ + '" frame missing height (no default)';
+        Dispose(SprData^.ImageName);
+        Dispose(SprData);
+        Exit;
+      end;
+
+      { Optional offset-x/offset-y }
+      if XMLHasAttr(FrameNode, 'offset-x') then
+        SprData^.Sprite.Frames[FrameIdx].OffsetX := StrToInt(XMLAttr(FrameNode, 'offset-x'))
+      else
+        SprData^.Sprite.Frames[FrameIdx].OffsetX := 0;
+
+      if XMLHasAttr(FrameNode, 'offset-y') then
+        SprData^.Sprite.Frames[FrameIdx].OffsetY := StrToInt(XMLAttr(FrameNode, 'offset-y'))
+      else
+        SprData^.Sprite.Frames[FrameIdx].OffsetY := 0;
+
+      { Optional per-frame duration }
+      if XMLHasAttr(FrameNode, 'duration') then
+      begin
+        SprData^.Sprite.Frames[FrameIdx].Duration := StrToReal(XMLAttr(FrameNode, 'duration'));
+        HasAnyFrameDur := True;
+      end
+      else
+        SprData^.Sprite.Frames[FrameIdx].Duration := 0.0;
+
+      Inc(FrameIdx);
+    end;
+    FrameNode := XMLNextSibling(FrameNode, '');
+  end;
+
+  { Store frame count }
+  SprData^.Sprite.FrameCount := FrameIdx;
+
+  if FrameIdx = 0 then
+  begin
+    LastError := 'Sprite "' + Desc^.Name^ + '" has no frames';
+    Dispose(SprData^.ImageName);
+    Dispose(SprData);
+    Exit;
+  end;
+
+  { Compute per-frame durations if any frame has explicit duration }
+  SprData^.Sprite.HasFrameDurations := HasAnyFrameDur;
+  if HasAnyFrameDur then
+  begin
+    DefaultDur := SprData^.Duration / FrameIdx;
+    TotalDur := 0.0;
+    for I := 0 to FrameIdx - 1 do
+    begin
+      if SprData^.Sprite.Frames[I].Duration <= 0.0 then
+        SprData^.Sprite.Frames[I].Duration := DefaultDur;
+      TotalDur := TotalDur + SprData^.Sprite.Frames[I].Duration;
+    end;
+    SprData^.Sprite.TotalDuration := TotalDur;
+  end
+  else
+    SprData^.Sprite.TotalDuration := 0.0;
+
+  { Store in descriptor }
+  Desc^.Data := SprData;
+  ParseSPXSprite := True;
+end;
+
+{ TResourceManager.ParseSPXFile }
+function TResourceManager.ParseSPXFile(const SPXDir, Filename: String): Boolean;
+var
+  SPXRoot: PXMLNode;
+  Child: PXMLNode;
+  Desc: PResourceDescriptor;
+  TagName: String;
+begin
+  ParseSPXFile := False;
+
+  if not XMLLoadFile(Filename, SPXRoot) then
+  begin
+    LastError := 'Failed to parse SPX file: ' + Filename;
+    Exit;
+  end;
+
+  Child := XMLFirstChild(SPXRoot, '');
+
+  while Child <> nil do
+  begin
+    TagName := Child^.Name;
+
+    if TagName = 'image' then
+    begin
+      { Create image descriptor with SPX-relative path }
+      New(Desc);
+      FillChar(Desc^, SizeOf(TResourceDescriptor), 0);
+
+      if not XMLHasAttr(Child, 'name') or not XMLHasAttr(Child, 'path') then
+      begin
+        LastError := 'SPX image missing name or path attribute';
+        Dispose(Desc);
+        XMLFreeTree(SPXRoot);
+        Exit;
+      end;
+
+      New(Desc^.Name);
+      Desc^.Name^ := XMLAttr(Child, 'name');
+      Desc^.ResType := ResType_Image;
+      Desc^.Loaded := False;
+
+      { Prepend SPX directory to image path }
+      New(Desc^.Path);
+      Desc^.Path^ := SPXDir + XMLAttr(Child, 'path');
+
+      { Check for palette attribute }
+      if XMLHasAttr(Child, 'palette') then
+      begin
+        New(Desc^.PaletteName);
+        Desc^.PaletteName^ := XMLAttr(Child, 'palette');
+      end
+      else
+        Desc^.PaletteName := nil;
+
+      ListAdd(Descriptors, Desc);
+    end
+    else if TagName = 'sprite' then
+    begin
+      { Create sprite descriptor }
+      New(Desc);
+      FillChar(Desc^, SizeOf(TResourceDescriptor), 0);
+
+      if not XMLHasAttr(Child, 'name') then
+      begin
+        LastError := 'SPX sprite missing name attribute';
+        Dispose(Desc);
+        XMLFreeTree(SPXRoot);
+        Exit;
+      end;
+
+      New(Desc^.Name);
+      Desc^.Name^ := XMLAttr(Child, 'name');
+      Desc^.ResType := ResType_Sprite;
+      Desc^.Path := nil;
+      Desc^.Loaded := False;
+
+      if not ParseSPXSprite(Child, Desc) then
+      begin
+        Dispose(Desc^.Name);
+        Dispose(Desc);
+        XMLFreeTree(SPXRoot);
+        Exit;
+      end;
+
+      ListAdd(Descriptors, Desc);
+    end;
+
+    Child := XMLNextSibling(Child, '');
+  end;
+
+  XMLFreeTree(SPXRoot);
+  ParseSPXFile := True;
 end;
 
 { TResourceManager.GetSound }

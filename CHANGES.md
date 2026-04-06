@@ -5,6 +5,26 @@ All notable changes to the DOS Game Engine will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-04-06
+
+SPX (Sprite XML) external file format for sprite definitions.
+
+### Added
+- SPX file format: external XML files for sprite sheet + animation definitions
+- `<sprite-xml path="FILE.SPX" />` tag in resources.xml to reference SPX files
+- TSpriteFrame record with per-frame drawing offsets (OffsetX, OffsetY)
+- Per-frame duration support for variable-speed animations
+- Default width/height on `<sprite>` tag inherited by frames
+- SPX format documentation (DOCS/ADVANCED/SPX.md)
+
+### Changed
+- TSprite.Frames now uses TSpriteFrame (with Rect, OffsetX, OffsetY, Duration) instead of TRectangle
+- TSprite gains HasFrameDurations and TotalDuration fields for variable timing
+- SpriteGetCurrentFrame supports cumulative duration lookup
+- DrawSprite and CheckSpriteCollision apply frame offsets (negated when flipped)
+
+---
+
 ## [1.0.0] - 2026-02-10
 
 First stable release - verified on real DOS hardware.

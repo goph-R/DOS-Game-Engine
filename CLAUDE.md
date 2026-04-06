@@ -212,9 +212,12 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 
 **SPRITE.PAS** - Delta-time sprite animation
 - Constants: SpritePlayType_Forward/PingPong/Once (0/1/2), MaxSpriteFrames = 64
-- Types: TSprite (PImage, Frames, FrameCount, Width, Height, Duration (seconds), PlayType), PSprite
+- Types: TSpriteFrame (Rect: TRectangle, OffsetX, OffsetY: Integer, Duration: Real), PSpriteFrame
+- TSprite (Image, Frames (array of TSpriteFrame), FrameCount, Width, Height, Duration, PlayType, HasFrameDurations, TotalDuration), PSprite
 - TSpriteInstance (Sprite, X, Y, FlipX, FlipY, CurrentTime, Hidden, PlayBackward), PSpriteInstance
 - UpdateSprite(instance,deltatime), DrawSprite(instance,fb), SpriteGetCurrentFrame(instance): Byte, CheckSpriteCollision(a,b): Boolean (pixel-perfect)
+- **Per-frame durations**: When HasFrameDurations=True, each frame uses its own Duration; SpriteGetCurrentFrame uses cumulative lookup
+- **Frame offsets**: OffsetX/OffsetY shift drawing position (negated when flipped)
 
 **RESMAN.PAS** - Resource manager (2025)
 - TResourceManager: Centralized asset loading from XML manifest
@@ -225,6 +228,10 @@ cd ..\TESTS && tpc -U..\UNITS VGATEST.PAS
 - Features: Lazy/eager loading, XML-relative paths, dependency resolution, name-based lookup
 - Music singleton: Only one music track loaded at a time (previous auto-unloaded)
 - Palette extraction: `<image name="x" path="X.PCX" palette="x" />` extracts palette from image
+- **SPX support**: `<sprite-xml path="FILE.SPX" />` loads external sprite XML files
+- SPX files use `<sprite-xml>` root, contain `<image>` and `<sprite>` tags
+- SPX sprites support: default width/height on `<sprite>`, per-frame offset-x/offset-y, per-frame duration
+- Image paths in SPX files are relative to the SPX file location
 - See DOCS\RESMAN.md for XML format
 
 **BASEGAME.PAS** - DOS Game Engine Core (2025)

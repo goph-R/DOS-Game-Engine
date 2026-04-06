@@ -1,0 +1,19 @@
+<sprite-xml>
+  <image name="player" path="PLAYER.PCX" palette="player" />
+
+  <sprite name="player_idle" image="player" width="32" height="32" duration="0.8">
+    <frame x="0" y="0" />
+    <frame x="32" y="0" />
+    <frame x="64" y="0" />
+    <frame x="96" y="0" />
+  </sprite>
+
+  <sprite name="player_run" image="player" width="32" height="32" duration="0.5">
+    <frame x="0" y="32" />
+    <frame x="32" y="32" />
+    <frame x="64" y="32" />
+    <frame x="96" y="32" />
+    <frame x="128" y="32" />
+    <frame x="160" y="32" />
+  </sprite>
+</sprite-xml>
